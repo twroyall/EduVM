@@ -1,0 +1,4 @@
+set 0 5
+move 0 gpa
+dump registers
+shutdown
