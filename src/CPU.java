@@ -16,6 +16,8 @@
 // :nameofmyblock                    This makes a block of code.
 // call                              This calls to a block of code expecting to be returned.
 
+import java.util.*;
+
 public class CPU{
   public int spc = 0; // These are the special purpose registers.
   public int sac = 0; // This is the accumulator register.
@@ -30,18 +32,29 @@ public class CPU{
   public int gpf = 0;
   public int gpg = 0;
   public int gph = 0;
-  public int setItTo = 0; // Using this for juggling data.
+  public int setItTo = 0; // Using this for juggling data around, especially in the case of registers and memory -> memory data transfers.
+
   public boolean hasBeenInitialized = false; // For when running files.
   public int initLocation = 0; // Default starting location for the sir register.
 
+  public boolean isInBlock = false; // To tell if it's in a block or not.
+  public int blockStartBuffer = 0;
+  public int blockEndBuffer = 0;
+  public int blockCount = 0;
+  public String blockNameBuffer;
+  public int startToGoTo; // These are specifically for the call command.
+  public int endToGoTo;
+
   String[] commands; // This is for the later parsing of the commands.
+  List<int[]> blockList = new ArrayList<int[]>(); // Use this to keep track of all the blocks. Each entry should have the starting and ending points of each block.
+  List<String> blockNames = new ArrayList<String>(); // This is the array list that holds the name of each block. The index of this matches the index of the block's starting and ending points as stored in the list of int arrays blockList.
 
   public int run(String command, boolean isLive, String[] memory){
     commands = command.split(" ");
 
-    System.out.println("Running command " + commands[0]);
+    System.out.println("Running command " + Arrays.toString(commands) + " at sir " + getRegister("sir") + " while inBlock: " + Boolean.toString(isInBlock));
 
-    if(commands[0].equals("add")){ // Add command.
+    if(commands[0].equals("add") && isInBlock == false){ // Add command.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) + Integer.parseInt(commands[2])));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -52,7 +65,7 @@ public class CPU{
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) + this.getRegister(commands[2])));
       }
       return 1;
-    } else if(commands[0].equals("sub")){ // Substract command.
+    } else if(commands[0].equals("sub") && isInBlock == false){ // Substract command.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) - Integer.parseInt(commands[2])));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -63,7 +76,7 @@ public class CPU{
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) - this.getRegister(commands[2])));
       }
       return 1;
-    } else if(commands[0].equals("mul")){ // Multiply command.
+    } else if(commands[0].equals("mul") && isInBlock == false){ // Multiply command.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) * Integer.parseInt(commands[2])));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -74,7 +87,7 @@ public class CPU{
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) * this.getRegister(commands[2])));
       }
       return 1;
-    } else if(commands[0].equals("div")){ // Divide command.
+    } else if(commands[0].equals("div") && isInBlock == false){ // Divide command.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) / Integer.parseInt(commands[2])));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -85,7 +98,7 @@ public class CPU{
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) / this.getRegister(commands[2])));
       }
       return 1;
-    } else if(commands[0].equals("mod")){ // Modulo command.
+    } else if(commands[0].equals("mod") && isInBlock == false){ // Modulo command.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) % Integer.parseInt(commands[2])));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -96,7 +109,7 @@ public class CPU{
         this.setRegister("sac", Integer.toString(Integer.parseInt(commands[1]) % this.getRegister(commands[2])));
       }
       return 1;
-    } else if(commands[0].equals("set")){ // Set register to value.
+    } else if(commands[0].equals("set") && isInBlock == false){ // Set register to value.
         if(isInteger(commands[2])){ // If this register is being set to a numerical value.
           this.setRegister(commands[1], commands[2]);
         } else if(isInteger(commands[2]) == false){ // If this register is being set to the value of another register.
@@ -104,7 +117,7 @@ public class CPU{
           this.setRegister(commands[1], Integer.toString(setItTo));
         }
         return 1;
-    } else if(commands[0].equals("dump") && commands[1].equals("registers")){ // Dump every register.
+    } else if(commands[0].equals("dump") && commands[1].equals("registers") && isInBlock == false){ // Dump every register.
       System.out.println("---------------------");
       System.out.println("Register spc: " + spc);
       System.out.println("Register sac: " + sac);
@@ -120,7 +133,7 @@ public class CPU{
       System.out.println("Register gph: " + gph);
       System.out.println("---------------------");
       return 1;
-    } else if(commands[0].equals("ifless")){
+    } else if(commands[0].equals("ifless") && isInBlock == false){
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         if(Integer.parseInt(commands[1]) < Integer.parseInt(commands[2])){
           this.setRegister("scb", "1");
@@ -147,7 +160,7 @@ public class CPU{
         }
       }
       return 1;
-    } else if(commands[0].equals("ifequal")){
+    } else if(commands[0].equals("ifequal") && isInBlock == false){
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         if(Integer.parseInt(commands[1]) == Integer.parseInt(commands[2])){
           this.setRegister("scb", "1");
@@ -174,7 +187,7 @@ public class CPU{
         }
       }
       return 1;
-    } else if(commands[0].equals("ifgreater")){ // If both arguments are integers.
+    } else if(commands[0].equals("ifgreater") && isInBlock == false){ // If both arguments are integers.
       if(isInteger(commands[1]) && isInteger(commands[2])){
         if(Integer.parseInt(commands[1]) > Integer.parseInt(commands[2])){
           this.setRegister("scb", "1");
@@ -201,7 +214,7 @@ public class CPU{
         }
       }
       return 1;
-    } else if(commands[0].equals("and")){ // And operation.
+    } else if(commands[0].equals("and") && isInBlock == false){ // And operation.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString((Integer.parseInt(commands[1]) & Integer.parseInt(commands[2]))));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -212,7 +225,7 @@ public class CPU{
         this.setRegister("sac", Integer.toString((Integer.parseInt(commands[1]) & this.getRegister(commands[2]))));
       }
       return 1;
-    } else if(commands[0].equals("or")){ // Or operation.
+    } else if(commands[0].equals("or") && isInBlock == false){ // Or operation.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString((Integer.parseInt(commands[1]) | Integer.parseInt(commands[2]))));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -223,14 +236,14 @@ public class CPU{
         this.setRegister("sac", Integer.toString((Integer.parseInt(commands[1]) | this.getRegister(commands[2]))));
       }
       return 1;
-    } else if(commands[0].equals("not")){ // Inversion / not / complement operation.
+    } else if(commands[0].equals("not") && isInBlock == false){ // Inversion / not / complement operation.
       if(isInteger(commands[1])){ // If the arguments is an integer.
         this.setRegister("sac", Integer.toString((~Integer.parseInt(commands[1]))));
       } else{ // If the argument is not an integer.
         this.setRegister("sac", Integer.toString((~this.getRegister(commands[1]))));
       }
       return 1;
-    } else if(commands[0].equals("xor")){ // Xor operation.
+    } else if(commands[0].equals("xor") && isInBlock == false){ // Xor operation.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString((Integer.parseInt(commands[1]) ^ Integer.parseInt(commands[2]))));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -242,7 +255,7 @@ public class CPU{
       this.setRegister("sac", Integer.toString(~(this.getRegister(commands[1]) & this.getRegister(commands[2]))));
     }
       return 1;
-    } else if(commands[0].equals("nand")){ // Nand operation (And + Not/Inversion/Complement).
+    } else if(commands[0].equals("nand") && isInBlock == false){ // Nand operation (And + Not/Inversion/Complement).
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString(~(Integer.parseInt(commands[1]) & Integer.parseInt(commands[2]))));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -252,7 +265,7 @@ public class CPU{
         this.setRegister("sac", Integer.toString(~(Integer.parseInt(commands[1]) & this.getRegister(commands[2]))));
       }
       return 1;
-    } else if(commands[0].equals("nor")){ // Nor operation (Or + Not/Inversion/Complement).
+    } else if(commands[0].equals("nor") && isInBlock == false){ // Nor operation (Or + Not/Inversion/Complement).
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString(~(Integer.parseInt(commands[1]) | Integer.parseInt(commands[2]))));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -263,7 +276,7 @@ public class CPU{
         this.setRegister("sac", Integer.toString(~(Integer.parseInt(commands[1]) | this.getRegister(commands[2]))));
       }
       return 1;
-    } else if(commands[0].equals("xnor")){ // Xnor operation (Xor + Not/Inversion/Complement).
+    } else if(commands[0].equals("xnor") && isInBlock == false){ // Xnor operation (Xor + Not/Inversion/Complement).
       if(isInteger(commands[1]) && isInteger(commands[2])){ // If both arguments are integers.
         this.setRegister("sac", Integer.toString(~(Integer.parseInt(commands[1]) ^ Integer.parseInt(commands[2]))));
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // If neither argument is an integer.
@@ -274,13 +287,13 @@ public class CPU{
         this.setRegister("sac", Integer.toString(~(Integer.parseInt(commands[1]) ^ this.getRegister(commands[2]))));
       }
       return 1;
-    } else if(commands[0].equals("read")){ //Read operator, you "read data_from_one_address address_to_where_its_going".
+    } else if(commands[0].equals("read") && isInBlock == false){ //Read operator, you "read data_from_one_address address_to_where_its_going".
        setRegister(commands[2], memory[Integer.parseInt(commands[1])]);
        return 1;
-    } else if(commands[0].equals("write")){ // Write operator, you "write data address_getting_written_to".
+    } else if(commands[0].equals("write") && isInBlock == false){ // Write operator, you "write data address_getting_written_to".
       memory[Integer.parseInt(commands[2])] = commands[1];
       return 1;
-    } else if(commands[0].equals("jump") && isLive == false){
+    } else if(commands[0].equals("jump") && isLive == false && isInBlock == false){
       // TODO: Make this able to interpret the value of a register as well.
       if(isInteger(commands[1])){ // If it's jumping to a direct location in memory represented by a number.
         System.out.println("Jumping to an int.");
@@ -294,9 +307,9 @@ public class CPU{
         setRegister("sir", Integer.toString(getRegister(commands[1])));
         return 0;
       }
-    } else if(commands[0].equals("shutdown")){
+    } else if(commands[0].equals("shutdown") && isInBlock == false){
       return -1;
-    } else if(commands[0].equals("move")){ // I need to make this work with numerical memory representations as well as register names.
+    } else if(commands[0].equals("move") && isInBlock == false){ // I need to make this work with numerical memory representations as well as register names.
       if(isInteger(commands[1]) && isInteger(commands[2])){ // Move address address.
         memory[Integer.parseInt(commands[1])] = memory[Integer.parseInt(commands[2])];
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == true){ // Move register address.
@@ -306,8 +319,43 @@ public class CPU{
       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // Move register register.
         setRegister(commands[2], Integer.toString(getRegister(commands[1])));
       }
-    } else if(commands[0].charAt(0) == 58){ // If a new block is being declared.
-      System.out.println("New block found, called " + commands[0].substring(1, commands[0].length()));
+    } else if(commands[0].charAt(0) == 58 || commands[0].charAt(0) == 59){ // If a new block is being declared.
+      // System.out.println("New block found, called " + commands[0].substring(1, commands[0].length()));
+      if(isInBlock == true){ // If you are already in a block. This means that the next found point should be a semicolon.
+        if(commands[0].charAt(0) == 59){ // Checking if the next found character is a semicolon.
+          blockEndBuffer = getRegister("sir"); // TODO: Check this for weaknesses against OBO errors.
+
+          blockList.add(blockCount, new int[] {blockStartBuffer, blockEndBuffer}); // This adds the proper data to blockList.
+          blockNames.add(blockCount, blockNameBuffer); // And also appropriately adds it to blockNames.
+
+          blockCount += 1; // Increment the amount of blocks that are present, so that we can keep a steady index on the amount of blocks that are stored in their respective data structures.
+          blockEndBuffer = 0;
+          blockStartBuffer = 0;
+          blockNameBuffer = "";
+          isInBlock = false;
+        }
+      } else{ // If you are not already in a block. This means that the next found point should be a normal colon.
+        if(commands[0].charAt(0) == 58){ // This just gets the whole thing going, so not too much going on here, but this is how a block is declared.
+          blockStartBuffer = (getRegister("sir")); // TOOD: Also check this one through for OBO errors.
+          blockNameBuffer = commands[0].substring(1, commands[0].length());
+          isInBlock = true;
+        }
+      }
+    } else if(commands[0].equals("call")){
+      //Set wherever the semicolon was to a "Jump ________" with the ________ being the memory that it originally jumped from, so the current sir register value.
+      System.out.println("CALL SET ALERT");
+
+      for(int i=0; i<blockNames.size(); i++){ // Iterate through blockNames.
+        if(commands[1].equals(blockNames.get(i))){ // If a match is found, then.
+          System.out.println("Calling block " + blockNames.get(i) + " at sir " + blockList.get(i)[0]); // Log to the file what's going on.
+          startToGoTo = blockList.get(i)[0]; // The first entry of the 2-dimensional int array blockList is the starting point.
+          endToGoTo = blockList.get(i)[1]; // And the second entry is the end point.
+        }
+      }
+
+      memory[endToGoTo] = "jump " + (getRegister("sir") + 1); // Set the end of that function to jump back to where you are right now.
+      setRegister("sir", Integer.toString(startToGoTo + 1)); // Set the sir register to go to where it needs to be.
+      return 0;
     } else{
       return 1; // Return 1 so that only 1 is added to sir and the next instruction gets read.
     }
@@ -362,6 +410,8 @@ public class CPU{
       this.gph = value;
     } else if (register.equals("scb")){
       this.scb = value;
+    } else if (register.equals("sjb")){
+      this.sjb = value;
     } else {
       throw new Error("Attempt to set register not detected by name of " + register + " to " + value);
     }
@@ -390,6 +440,8 @@ public class CPU{
       return this.gpg;
     } else if(register.equals("gph")){
       return this.gph;
+    } else if(register.equals("sjb")){
+      return this.sjb;
     } else {
       throw new Error("Attempt to get register not detected by name of " + register);
     }

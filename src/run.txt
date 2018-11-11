@@ -1,5 +1,8 @@
-73
-move 0 gpa
-:NEWLABELABCDEFG
+:FIRSTLABEL
+set gpc 73
+;
+dump registers
+call FIRSTLABEL
+set gpa 23
 dump registers
 shutdown
