@@ -1,4 +1,5 @@
-set 0 5
+73
 move 0 gpa
+:NEWLABELABCDEFG
 dump registers
 shutdown

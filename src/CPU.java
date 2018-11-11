@@ -13,17 +13,15 @@
 
 //Still to make: jump, move, call, jumpindirect, and making a block by going :whatever.
 
-// jump address               If scb is 1 then you will set the sir to the address after this command.
-// move address address               Just moves data from the first address to the second one.
-// call                              This calls to a block of code expecting to be returned.
-// jumpindirect                      This goes to the block without ever expecting to be returned.
 // :nameofmyblock                    This makes a block of code.
+// call                              This calls to a block of code expecting to be returned.
 
 public class CPU{
   public int spc = 0; // These are the special purpose registers.
   public int sac = 0; // This is the accumulator register.
   public int sir = 0; // This is the instruction register.
   public int scb = 0; // This is the conditional branch result register.
+  public int sjb = 0; // This is the jump back register, so that after a direct (a.k.a standard) jump, you know how to return upon hitting a "jump back" command.
   public int gpa = 0; // These are the general purpose registers, from here on down.
   public int gpb = 0;
   public int gpc = 0;
@@ -287,7 +285,10 @@ public class CPU{
       if(isInteger(commands[1])){ // If it's jumping to a direct location in memory represented by a number.
         System.out.println("Jumping to an int.");
         setRegister("sir", commands[1]);
+        setRegister("sjb", Integer.toString(getRegister("sjb")));
         return 0;
+      } else if(commands[1].equals("back")){
+        setRegister("sir", Integer.toString(getRegister("sjb"))); // This is for jumping back.
       } else{ // If it's jumping to a location stored in a register.
       System.out.println("Jumping to a register.");
         setRegister("sir", Integer.toString(getRegister(commands[1])));
@@ -296,21 +297,17 @@ public class CPU{
     } else if(commands[0].equals("shutdown")){
       return -1;
     } else if(commands[0].equals("move")){ // I need to make this work with numerical memory representations as well as register names.
-       // setRegister(commands[2], commands[1]);
-       // return 1;
-       //
-       System.out.println("isInteger result of first term: " + Boolean.toString(isInteger(commands[1])));
-       System.out.println("isInteger result of second term: " + Boolean.toString(isInteger(commands[2])));
-       if(isInteger(commands[1]) && isInteger(commands[2])){ // Move address address
-        System.out.println("Moving register to register.");
+      if(isInteger(commands[1]) && isInteger(commands[2])){ // Move address address.
         memory[Integer.parseInt(commands[1])] = memory[Integer.parseInt(commands[2])];
-       } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == true){ // Move register address
-       //
-     } else if(isInteger(commands[1]) == true && isInteger(commands[2]) == false){ // Move address register
-       setRegister(commands[2], memory[Integer.parseInt(commands[1])]);
-     } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // Move register register
-       //
-     }
+      } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == true){ // Move register address.
+        memory[Integer.parseInt(commands[2])] = Integer.toString(getRegister(commands[1]));
+      } else if(isInteger(commands[1]) == true && isInteger(commands[2]) == false){ // Move address register.
+        setRegister(commands[2], memory[Integer.parseInt(commands[1])]);
+      } else if(isInteger(commands[1]) == false && isInteger(commands[2]) == false){ // Move register register.
+        setRegister(commands[2], Integer.toString(getRegister(commands[1])));
+      }
+    } else if(commands[0].charAt(0) == 58){ // If a new block is being declared.
+      System.out.println("New block found, called " + commands[0].substring(1, commands[0].length()));
     } else{
       return 1; // Return 1 so that only 1 is added to sir and the next instruction gets read.
     }
@@ -318,8 +315,8 @@ public class CPU{
   }
 
   public void initialize(int startingSir){
-    //hasBeenInitialized = true;
-    //initLocation = startingSir;
+    hasBeenInitialized = true;
+    initLocation = startingSir;
   }
 
   public void start(String[] memory){
